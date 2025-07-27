@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WSET2 葡萄酒学习助手</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- React and ReactDOM CDNs -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Firebase CDNs (type="module" scripts are deferred by default) -->
+    <script type="module">
+        // 从Firebase CDN导入模块
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // 将Canvas环境中可能提供的全局变量注入到window对象，以便在脚本中访问
+        // 这些变量通常由Canvas环境提供，用于初始化Firebase和用户认证
+        window.__app_id = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        window.__firebase_config = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        window.__initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // 直接将Firebase函数暴露到全局window对象，供后续的React代码使用
+        window.initializeApp = initializeApp;
+        window.getAuth = getAuth;
+        window.signInAnonymously = signInAnonymously;
+        window.signInWithCustomToken = signInWithCustomToken;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.getFirestore = getFirestore;
+        window.doc = doc;
+        window.setDoc = setDoc;
+        window.onSnapshot = onSnapshot;
+    </script>
+    <style>
+        /* 全局动画定义 */
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .animate-gradient-shift {
+            background: linear-gradient(135deg, #fce4ec, #e0f2f7, #ffe0b2, #f3e5f5); /* 更亮、更多变的渐变色 */
+            background-size: 400% 400%;
+            animation: gradient-shift 15s ease infinite;
+        }
+        @keyframes float-subtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-float-subtle {
+            animation: float-subtle 4s ease-in-out infinite;
+        }
+        @keyframes slide-in-bottom {
+            0% { transform: translateY(20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-in-bottom {
+            animation: slide-in-bottom 0.6s ease-out forwards;
+        }
+        /* 抽认卡3D翻转效果样式 */
+        .flashcard-container {
+            position: relative;
+            transform-style: preserve-3d;
+        }
+        .flashcard-face, .flashcard-back {
+            backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+    </style>
+</head>
+<body class="font-inter antialiased">
+    <div id="root"></div>
+
+    <script type="text/javascript">
+        // 确保在整个页面加载完成后再运行React应用
+        window.onload = function() {
+            // 获取React的hooks和Firebase导出的函数 (现在直接从window获取)
+            const { useState, useEffect, createContext, useContext } = React;
+            const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore, doc, setDoc, onSnapshot } = window;
+
+            // 创建Firebase上下文
+            const FirebaseContext = createContext(null);
+
+            /**
+             * App组件是整个应用程序的根组件。
+             * 它负责Firebase的初始化、用户认证、数据解析以及模式切换（学习模式或抽认卡模式）。
+             */
+            const App = () => {
+                // 定义当前应用程序的模式：'home'（主页）, 'learn'（学习）, 'flashcard'（抽认卡）
+                const [mode, setMode] = useState('home');
+                // Firebase相关的状态
+                const [app, setApp] = useState(null);
+                const [db, setDb] = useState(null);
+                const [auth, setAuth] = useState(null);
+                const [userId, setUserId] = useState(null); // 当前用户的ID
+                const [isAuthReady, setIsAuthReady] = useState(false); // 认证是否完成
+                // 学习进度状态，包括上次学习的索引和已掌握的抽认卡
+                const [learningProgress, setLearningProgress] = useState({ lastLearnedIndex: 0, learnedFlashcards: {} });
+                // 加载状态，用于显示加载提示
+                const [loadingFirebase, setLoadingFirebase] = useState(true);
+                // 新增：加载词汇数据的状态
+                const [loadingVocabulary, setLoadingVocabulary] = useState(true);
+                // 词汇数据状态
+                const [vocabulary, setVocabulary] = useState([]);
+
+                /**
+                 * 解析CSV字符串为词汇数组。
+                 * @param {string} csv - 待解析的CSV字符串。
+                 * @returns {Array<Object>} - 包含中文、英文和说明的词汇对象数组。
+                 */
+                const parseCSV = (csv) => {
+                    // 按行分割，并过滤掉空行
+                    const lines = csv.split('\n').filter(line => line.trim() !== '');
+                    if (lines.length === 0) return [];
+
+                    // 跳过标题行，直接处理数据
+                    const data = [];
+                    for (let i = 1; i < lines.length; i++) {
+                        const currentLine = lines[i].split(',');
+                        // 确保行有足够的列
+                        if (currentLine.length < 2) continue;
+
+                        const item = {};
+                        item.chinese = currentLine[0] ? currentLine[0].trim() : '';
+                        item.english = currentLine[1] ? currentLine[1].trim() : '';
+                        // 将剩余部分合并为说明，以防说明中包含逗号
+                        item.explanation = currentLine.slice(2).join(',').trim();
+                        data.push(item);
+                    }
+                    return data;
+                };
+
+                // Firebase初始化和认证的useEffect
+                useEffect(() => {
+                    const initializeFirebase = async () => {
+                        try {
+                            // 从window对象获取Firebase配置
+                            const firebaseConfig = window.__firebase_config;
+                            const initializedApp = initializeApp(firebaseConfig);
+                            const firestoreDb = getFirestore(initializedApp);
+                            const firebaseAuth = getAuth(initializedApp);
+
+                            setApp(initializedApp);
+                            setDb(firestoreDb);
+                            setAuth(firebaseAuth);
+
+                            // 从window对象获取初始认证令牌
+                            const initialAuthToken = window.__initial_auth_token;
+
+                            // 监听认证状态变化
+                            onAuthStateChanged(firebaseAuth, async (user) => {
+                                if (user) {
+                                    // 如果用户已认证，设置用户ID
+                                    setUserId(user.uid);
+                                    setIsAuthReady(true);
+                                } else {
+                                    // 如果用户未认证，尝试使用自定义令牌或匿名登录
+                                    try {
+                                        if (initialAuthToken) {
+                                            await signInWithCustomToken(firebaseAuth, initialAuthToken);
+                                        } else {
+                                            await signInAnonymously(firebaseAuth);
+                                        }
+                                    } catch (error) {
+                                        console.error("Firebase认证错误:", error);
+                                        // 如果匿名登录失败，则生成一个随机ID作为用户ID
+                                        setUserId(crypto.randomUUID());
+                                        setIsAuthReady(true);
+                                    }
+                                }
+                                setLoadingFirebase(false); // 认证完成后，设置加载状态为false
+                            });
+                        } catch (error) {
+                            console.error("初始化Firebase失败:", error);
+                            setLoadingFirebase(false);
+                        }
+                    };
+
+                    initializeFirebase();
+                }, []); // 空依赖数组确保只在组件挂载时运行一次
+
+                // 监听学习进度更新的useEffect
+                useEffect(() => {
+                    // 只有当Firestore、用户ID和认证准备就绪后才监听
+                    if (!db || !userId || !isAuthReady) return;
+
+                    // 获取应用程序ID，如果未定义则使用默认值
+                    const appId = window.__app_id;
+                    // 构建Firestore文档引用路径，存储在用户私有数据中
+                    const progressDocRef = doc(db, `artifacts/${appId}/users/${userId}/wine_learning_progress`, 'progress');
+
+                    // 实时监听文档快照
+                    const unsubscribe = onSnapshot(progressDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            // 如果文档存在，更新学习进度状态
+                            const data = docSnap.data();
+                            setLearningProgress({
+                                lastLearnedIndex: data.lastLearnedIndex || 0,
+                                learnedFlashcards: data.learnedFlashcards || {},
+                            });
+                        } else {
+                            // 如果文档不存在，创建初始进度文档
+                            setDoc(progressDocRef, { lastLearnedIndex: 0, learnedFlashcards: {} })
+                                .catch(error => console.error("创建初始进度文档错误:", error));
+                        }
+                    }, (error) => {
+                        console.error("监听进度错误:", error);
+                    });
+
+                    return () => unsubscribe(); // 组件卸载时取消监听
+                }, [db, userId, isAuthReady]); // 依赖项：db, userId, isAuthReady
+
+                // 加载CSV文件的useEffect
+                useEffect(() => {
+                    const loadVocabulary = async () => {
+                        try {
+                            // TODO: 请将 '葡萄酒复习知识苦_中英文对照表.xlsx - 中英文对照表.csv' 替换为您实际的CSV文件名
+                            // 注意：现在CSV文件假设位于 'data/' 文件夹中，且 'flashcard.html' 位于 'flashcard_function/'
+                            // 因此相对路径为 '../data/您的实际文件名.csv'
+                            const filename = 'origin_table_ch_en.csv'; // 这里使用您的实际文件名
+                            const encodedFilename = encodeURIComponent(filename);
+                            // 假设CSV文件位于 data/ 目录下，且当前HTML文件在 flashcard_function/ 目录下
+                            // 所以路径是 '../data/encodedFilename'
+                            const response = await fetch(`../data/${encodedFilename}`); // 修改点：路径调整为指向 data 文件夹
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            const text = await response.text();
+                            const parsedData = parseCSV(text);
+                            setVocabulary(parsedData);
+                        } catch (error) {
+                            console.error("加载词汇数据失败:", error);
+                            // 可以在这里设置一个错误状态或显示用户友好的消息
+                        } finally {
+                            setLoadingVocabulary(false);
+                        }
+                    };
+
+                    loadVocabulary();
+                }, []); // 空依赖数组确保只在组件挂载时加载一次
+
+                /**
+                 * 更新Firestore中的学习进度。
+                 * @param {Object} newProgress - 包含要更新的进度的对象。
+                 */
+                const updateLearningProgress = async (newProgress) => {
+                    if (!db || !userId) {
+                        console.error("Firestore未初始化或用户未认证。");
+                        return;
+                    }
+                    const appId = window.__app_id;
+                    const progressDocRef = doc(db, `artifacts/${appId}/users/${userId}/wine_learning_progress`, 'progress');
+                    try {
+                        // 使用merge: true，以便只更新指定的字段而不覆盖整个文档
+                        await setDoc(progressDocRef, newProgress, { merge: true });
+                    } catch (error) {
+                        console.error("更新学习进度错误:", error);
+                    }
+                };
+
+                /**
+                 * 处理模式切换。
+                 * @param {string} newMode - 新的模式（'home', 'learn', 'flashcard'）。
+                 */
+                const handleModeChange = (newMode) => {
+                    setMode(newMode);
+                };
+
+                // 如果Firebase或词汇数据正在加载，显示加载提示
+                if (loadingFirebase || loadingVocabulary) {
+                    return React.createElement(
+                        'div',
+                        { className: 'flex items-center justify-center min-h-screen font-inter animate-gradient-shift' },
+                        React.createElement('p', { className: 'text-xl text-gray-700' }, '加载中...')
+                    );
+                }
+
+                return React.createElement(
+                    FirebaseContext.Provider,
+                    { value: { db, userId, learningProgress, updateLearningProgress, vocabulary } },
+                    React.createElement(
+                        'div',
+                        { className: 'min-h-screen w-full flex flex-col items-center py-8 px-4 font-inter antialiased relative overflow-hidden animate-gradient-shift' },
+                        React.createElement(
+                            'h1',
+                            { className: 'text-5xl sm:text-6xl font-extrabold text-gray-900 mb-8 rounded-xl p-3 bg-white bg-opacity-90 shadow-2xl text-center leading-tight tracking-tight transform hover:scale-105 transition-transform duration-300 ease-out animate-float-subtle' },
+                            'WSET2 葡萄酒学习助手'
+                        ),
+                        // 显示用户ID，方便多用户协作
+                        userId && React.createElement(
+                            'div',
+                            { className: 'bg-white p-2 rounded-md shadow-sm mb-4' },
+                            React.createElement('p', { className: 'text-xs sm:text-sm text-gray-600' }, '用户ID: ', React.createElement('span', { className: 'font-mono break-all' }, userId))
+                        ),
+                        // 根据当前模式渲染不同组件
+                        mode === 'home' && React.createElement(HomePage, { onSelectMode: handleModeChange }),
+                        mode === 'learn' && React.createElement(LearningMode, { onBack: () => setMode('home') }),
+                        mode === 'flashcard' && React.createElement(FlashcardMode, { onBack: () => setMode('home') })
+                    )
+                );
+            };
+
+            /**
+             * HomePage组件：显示两种学习模式的选择按钮。
+             * 界面将更加活泼，带有动态效果。
+             * @param {Object} props - 组件属性。
+             * @param {Function} props.onSelectMode - 选择模式的回调函数。
+             */
+            const HomePage = ({ onSelectMode }) => {
+                return React.createElement(
+                    'div',
+                    { className: 'flex flex-col space-y-6 w-full max-w-sm sm:max-w-md p-6 bg-white bg-opacity-95 rounded-2xl shadow-3xl transform -translate-y-2 animate-slide-in-bottom border border-gray-100' },
+                    React.createElement(
+                        'button',
+                        { className: 'bg-red-700 hover:bg-red-800 text-white font-bold py-5 px-8 rounded-full shadow-xl transition-all duration-300 ease-in-out transform hover:scale-110 hover:rotate-1 focus:outline-none focus:ring-6 focus:ring-red-300 active:bg-red-900 text-xl tracking-wider', onClick: () => onSelectMode('learn') },
+                        '🍷 序列学习'
+                    ),
+                    React.createElement(
+                        'button',
+                        { className: 'bg-purple-700 hover:bg-purple-800 text-white font-bold py-5 px-8 rounded-full shadow-xl transition-all duration-300 ease-in-out transform hover:scale-110 hover:-rotate-1 focus:outline-none focus:ring-6 focus:ring-purple-300 active:bg-purple-900 text-xl tracking-wider', onClick: () => onSelectMode('flashcard') },
+                        '✨ 抽认卡复习'
+                    )
+                );
+            };
+
+            /**
+             * LearningMode组件：提供词汇的顺序学习功能。
+             * @param {Object} props - 组件属性。
+             * @param {Function} props.onBack - 返回主页的回调函数。
+             */
+            const LearningMode = ({ onBack }) => {
+                // 从上下文中获取学习进度、更新函数和词汇数据
+                const { learningProgress, updateLearningProgress, vocabulary } = useContext(FirebaseContext);
+                // 当前显示的词汇索引
+                const [currentIndex, setCurrentIndex] = useState(0);
+                // 控制说明是否显示
+                const [showExplanation, setShowExplanation] = useState(false);
+
+                // 组件挂载时，设置当前索引为上次学习的索引
+                useEffect(() => {
+                    if (learningProgress) {
+                        setCurrentIndex(learningProgress.lastLearnedIndex);
+                    }
+                }, [learningProgress]);
+
+                /**
+                 * 处理“下一页”按钮点击事件。
+                 * 更新索引，隐藏说明，并更新Firestore中的学习进度。
+                 */
+                const handleNext = () => {
+                    const nextIndex = (currentIndex + 1) % vocabulary.length;
+                    setCurrentIndex(nextIndex);
+                    setShowExplanation(false);
+                    updateLearningProgress({ lastLearnedIndex: nextIndex });
+                };
+
+                /**
+                 * 处理“上一页”按钮点击事件。
+                 * 更新索引，隐藏说明。不更新Firestore中的lastLearnedIndex。
+                 */
+                const handlePrevious = () => {
+                    const prevIndex = (currentIndex - 1 + vocabulary.length) % vocabulary.length;
+                    setCurrentIndex(prevIndex);
+                    setShowExplanation(false);
+                };
+
+                /**
+                 * 处理“我学会了”按钮点击事件。
+                 * 本质上就是前进到下一项。
+                 */
+                const handleMarkLearned = () => {
+                    handleNext();
+                };
+
+                // 如果词汇数据为空，显示提示信息
+                if (vocabulary.length === 0) {
+                    return React.createElement(
+                        'div',
+                        { className: 'text-center p-4 bg-white rounded-lg shadow-md max-w-md mx-auto' },
+                        React.createElement('p', { className: 'text-lg text-gray-700 mb-4' }, '没有可用的词汇。请检查数据源。'),
+                        React.createElement(
+                            'button',
+                            { className: 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105', onClick: onBack },
+                            '返回主页'
+                        )
+                    );
+                }
+
+                // 获取当前显示的词汇项
+                const currentItem = vocabulary[currentIndex];
+
+                return React.createElement(
+                    'div',
+                    { className: 'flex flex-col items-center w-full max-w-xl sm:max-w-2xl bg-white p-6 rounded-lg shadow-xl border border-gray-200' },
+                    React.createElement('h2', { className: 'text-2xl sm:text-3xl font-bold mb-6 text-gray-800' }, '按照序列学习'),
+                    React.createElement(
+                        'div',
+                        { className: 'w-full text-center mb-6 p-6 border-2 border-blue-300 rounded-xl bg-blue-50 transition-all duration-300 ease-in-out' },
+                        React.createElement('p', { className: 'text-2xl sm:text-3xl font-semibold mb-2 text-blue-800' }, currentItem.chinese),
+                        React.createElement('p', { className: 'text-xl sm:text-2xl text-blue-700 mb-4' }, currentItem.english),
+                        showExplanation && React.createElement('p', { className: 'text-md sm:text-lg text-gray-600 mt-4 leading-relaxed' }, currentItem.explanation)
+                    ),
+                    React.createElement(
+                        'button',
+                        { className: 'bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 mb-6 focus:outline-none focus:ring-4 focus:ring-purple-300', onClick: () => setShowExplanation(!showExplanation) },
+                        showExplanation ? '隐藏说明' : '显示说明'
+                    ),
+                    React.createElement(
+                        'div',
+                        { className: 'flex justify-between w-full max-w-xs sm:max-w-sm mb-6' },
+                        React.createElement(
+                            'button',
+                            { className: 'bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-300', onClick: handlePrevious },
+                            '上一页'
+                        ),
+                        React.createElement(
+                            'button',
+                            { className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300', onClick: handleNext },
+                            `下一页 (${currentIndex + 1}/${vocabulary.length})`
+                        )
+                    ),
+                    React.createElement(
+                        'button',
+                        { className: 'bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-green-300', onClick: handleMarkLearned },
+                        '我学会了 (前往下一项)'
+                    ),
+                    React.createElement(
+                        'button',
+                        { className: 'mt-8 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2.5 px-5 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-200', onClick: onBack },
+                        '返回主页'
+                    )
+                );
+            };
+
+            /**
+             * FlashcardMode组件：提供抽认卡复习功能。
+             * @param {Object} props - 组件属性。
+             * @param {Function} props.onBack - 返回主页的回调函数。
+             */
+            const FlashcardMode = ({ onBack }) => {
+                // 从上下文中获取学习进度、更新函数和词汇数据
+                const { learningProgress, updateLearningProgress, vocabulary } = useContext(FirebaseContext);
+                // 乱序后的词汇数组
+                const [shuffledVocabulary, setShuffledVocabulary] = useState([]);
+                // 当前抽认卡的索引
+                const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+                // 控制是否显示抽认卡背面（即英文和说明）
+                const [showBack, setShowBack] = useState(false);
+
+                // 组件挂载时或词汇数据变化时，洗牌词汇并重置索引
+                useEffect(() => {
+                    handleShuffle();
+                }, [vocabulary]); // 依赖项：vocabulary
+
+                /**
+                 * 处理抽认卡翻转。
+                 */
+                const handleFlip = () => {
+                    setShowBack(!showBack);
+                };
+
+                /**
+                 * 处理“下一张”抽认卡点击事件。
+                 * 更新索引，隐藏背面。
+                 */
+                const handleNextFlashcard = () => {
+                    const nextIndex = (currentFlashcardIndex + 1) % shuffledVocabulary.length;
+                    setCurrentFlashcardIndex(nextIndex);
+                    setShowBack(false); // 翻到下一张时，默认显示正面
+                };
+
+                /**
+                 * 处理“我掌握了这张卡片”按钮点击事件。
+                 * 将当前卡片标记为已掌握，并更新Firestore，然后前进到下一张。
+                 */
+                const handleMarkLearned = () => {
+                    if (!shuffledVocabulary[currentFlashcardIndex]) return;
+
+                    const term = shuffledVocabulary[currentFlashcardIndex].chinese;
+                    // 使用一个对象来存储已掌握的卡片，键是中文词汇，值为true
+                    const newLearnedFlashcards = { ...learningProgress.learnedFlashcards, [term]: true };
+                    updateLearningProgress({ ...learningProgress, learnedFlashcards: newLearnedFlashcards });
+                    handleNextFlashcard();
+                };
+
+                /**
+                 * 处理“洗牌”按钮点击事件。
+                 * 重新打乱词汇顺序，并重置到第一张卡片。
+                 */
+                const handleShuffle = () => {
+                    setShuffledVocabulary([...vocabulary].sort(() => Math.random() - 0.5));
+                    setCurrentFlashcardIndex(0);
+                    setShowBack(false);
+                };
+
+                // 如果词汇数据为空，显示提示信息
+                if (vocabulary.length === 0) {
+                    return React.createElement(
+                        'div',
+                        { className: 'text-center p-4 bg-white rounded-lg shadow-md max-w-md mx-auto' },
+                        React.createElement('p', { className: 'text-lg text-gray-700 mb-4' }, '没有可用的词汇。请检查数据源。'),
+                        React.createElement(
+                            'button',
+                            { className: 'bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out transform hover:scale-105', onClick: onBack },
+                            '返回主页'
+                        )
+                    );
+                }
+
+                // 获取当前显示的抽认卡
+                const currentFlashcard = shuffledVocabulary[currentFlashcardIndex];
+                // 检查当前卡片是否已被标记为已掌握
+                const isLearned = learningProgress.learnedFlashcards[currentFlashcard?.chinese];
+
+                return React.createElement(
+                    'div',
+                    { className: 'flex flex-col items-center w-full max-w-md sm:max-w-xl bg-white p-6 rounded-lg shadow-xl border border-gray-200' },
+                    React.createElement('h2', { className: 'text-2xl sm:text-3xl font-bold mb-6 text-gray-800' }, '抽认卡复习'),
+                    // 抽认卡容器，点击可翻转
+                    React.createElement(
+                        'div',
+                        {
+                            className: `flashcard-container relative w-full h-64 sm:h-80 bg-blue-100 rounded-xl shadow-lg flex items-center justify-center cursor-pointer transform transition-all duration-500 ease-in-out ${showBack ? 'rotate-y-180' : ''}`,
+                            onClick: handleFlip,
+                            style: { perspective: '1000px' } // 保持3D透视效果
+                        },
+                        // 抽认卡正面：显示中文词汇
+                        React.createElement(
+                            'div',
+                            { className: `flashcard-face absolute w-full h-full backface-hidden flex items-center justify-center p-4 text-center rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 transition-opacity duration-300 ${showBack ? 'opacity-0' : 'opacity-100'}` },
+                            React.createElement('p', { className: 'text-3xl sm:text-4xl font-extrabold text-blue-800 leading-tight' }, currentFlashcard?.chinese)
+                        ),
+                        // 抽认卡背面：显示英文词汇和说明
+                        React.createElement(
+                            'div',
+                            { className: `flashcard-back absolute w-full h-full backface-hidden flex flex-col items-center justify-center p-4 text-center rounded-xl bg-gradient-to-br from-blue-200 to-blue-300 rotate-y-180 transition-opacity duration-300 ${showBack ? 'opacity-100' : 'opacity-0'}` },
+                            React.createElement('p', { className: 'text-2xl sm:text-3xl font-semibold text-blue-700 mb-2 leading-tight' }, currentFlashcard?.english),
+                            React.createElement('p', { className: 'text-lg sm:text-xl text-blue-600 mt-2 leading-relaxed' }, currentFlashcard?.explanation)
+                        )
+                    ),
+                    React.createElement(
+                        'div',
+                        { className: 'flex justify-between w-full max-w-xs sm:max-w-sm mt-8 mb-6' },
+                        React.createElement(
+                            'button',
+                            { className: 'bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-300', onClick: handleShuffle },
+                            '洗牌'
+                        ),
+                        React.createElement(
+                            'button',
+                            { className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300', onClick: handleNextFlashcard },
+                            `下一张 (${currentFlashcardIndex + 1}/${shuffledVocabulary.length})`
+                        )
+                    ),
+                    React.createElement(
+                        'button',
+                        {
+                            className: `font-bold py-4 px-8 rounded-xl shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-2xl focus:outline-none focus:ring-4 ${isLearned ? 'bg-gray-300 text-gray-700 cursor-not-allowed ring-gray-200' : 'bg-green-600 hover:bg-green-700 text-white ring-green-300'}`,
+                            onClick: handleMarkLearned,
+                            disabled: isLearned
+                        },
+                        isLearned ? '已掌握' : '我掌握了这张卡片'
+                    ),
+                    React.createElement(
+                        'button',
+                        { className: 'mt-8 bg-gray-400 hover:bg-gray-500 text-white font-bold py-2.5 px-5 rounded-lg shadow-md transition-all duration-300 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-gray-200', onClick: onBack },
+                        '返回主页'
+                    )
+                );
+            };
+
+            // 将App组件渲染到DOM中的id为'root'的元素
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(React.createElement(App, null));
+        }; // End of window.onload
+    </script>
+</body>
+</html>

@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WSET 2级练习题</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 20px;
+        }
+        .quiz-section {
+            display: none; /* Hidden by default */
+        }
+        .quiz-section.active {
+            display: block;
+        }
+        .question-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out; /* Smooth transition for highlight */
+        }
+        .question-card.highlight-question {
+            border-color: #ef4444; /* Red border for highlight */
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.4); /* Red glow */
+        }
+        .option-container {
+            margin-bottom: 8px; /* Spacing between options */
+        }
+        .option-label {
+            display: block;
+            padding: 10px 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .option-label:hover {
+            background-color: #e2e8f0;
+            border-color: #94a3b8;
+        }
+        input[type="radio"]:checked + .option-label {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+            box-shadow: 0 2px 5px rgba(59, 130, 246, 0.3);
+        }
+        input[type="radio"] {
+            display: none; /* Hide default radio button */
+        }
+        .button {
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .button-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .button-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-1px);
+        }
+        .button-secondary {
+            background-color: #64748b;
+            color: white;
+        }
+        .button-secondary:hover {
+            background-color: #475569;
+            transform: translateY(-1px);
+        }
+        .button-tertiary {
+            background-color: #10b981; /* Greenish color for Save */
+            color: white;
+        }
+        .button-tertiary:hover {
+            background-color: #059669;
+            transform: translateY(-1px);
+        }
+        .results-section {
+            display: none;
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .results-section.active {
+            display: block;
+        }
+        .answer-item {
+            padding: 8px 0;
+            border-bottom: 1px dashed #e2e8f0;
+        }
+        .answer-item:last-child {
+            border-bottom: none;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border-radius: 12px;
+            width: 80%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .correct-answer {
+            color: #10b981; /* Green for correct answers */
+            font-weight: 600;
+        }
+        .wrong-answer {
+            color: #ef4444; /* Red for wrong answers */
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8">
+    <div class="container mx-auto p-6 bg-white rounded-xl shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">WSET 2级练习题</h1>
+
+        <!-- Test Paper Selection Section -->
+        <div id="test-selection-section" class="mb-8 text-center">
+            <h2 class="text-xl font-semibold text-gray-700 mb-4">请选择一套试卷进行作答：</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+                <button class="button button-primary" onclick="startQuiz('exam1')">第一套试卷</button>
+                <button class="button button-primary" onclick="startQuiz('exam2')">第二套试卷</button>
+                <button class="button button-primary" onclick="startQuiz('exam3')">第三套试卷</button>
+                <button class="button button-primary" onclick="startQuiz('exam4')">第四套试卷</button>
+            </div>
+        </div>
+
+        <!-- Quiz Section -->
+        <div id="quiz-section" class="quiz-section">
+            <h2 id="quiz-title" class="text-2xl font-bold text-gray-800 mb-6 text-center"></h2>
+            <form id="quiz-form">
+                <!-- Questions will be dynamically loaded here -->
+            </form>
+            <div class="mt-8 text-center flex flex-col sm:flex-row justify-center gap-4">
+                <button id="save-answers-button" class="button button-tertiary w-full sm:w-auto" onclick="saveUserAnswers()">保存答案</button>
+                <button id="submit-quiz-button" class="button button-primary w-full sm:w-auto" onclick="handleQuizSubmission()">提交</button>
+                <button id="back-to-selection-button" class="button button-secondary w-full sm:w-auto" onclick="confirmResetQuiz()">返回试卷选择</button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-section" class="results-section">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">您的答题结果</h2>
+            <p id="quiz-score" class="text-xl font-semibold text-gray-800 mb-4"></p>
+            <div id="answer-sheet" class="mb-6 max-h-96 overflow-y-auto p-4 border border-gray-200 rounded-lg bg-white">
+                <!-- Answer sheet will be displayed here -->
+            </div>
+            <div class="flex flex-col sm:flex-row justify-center gap-4">
+                <button class="button button-primary w-full sm:w-auto" onclick="downloadResults()">下载答题结果</button>
+                <button class="button button-secondary w-full sm:w-auto" onclick="resetQuiz()">重新开始</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Modal for Messages -->
+    <div id="customModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeModal()">&times;</span>
+            <p id="modalMessage" class="text-lg text-gray-700"></p>
+            <div class="modal-buttons">
+                <button class="button button-primary" id="modalConfirmButton" onclick="closeModal()">确定</button>
+                <button class="button button-secondary hidden" id="modalCustomButton"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Quiz data including questions and options
+        const quizData = {
+            exam1: [
+                { questionNumber: "1", questionText: "下列哪种物质果皮里没有?", options: ["A 颜色", "B 糖分", "C 单宁", "D 风味物质"] },
+                { questionNumber: "2", questionText: "下列哪个不是葡萄藤生长所必需的?", options: ["A 氧气", "B 二氧化碳", "C 阳光", "D 水分"] },
+                { questionNumber: "3", questionText: "葡萄在成熟期开始:", options: ["A 变小", "B 酸度提高", "C 酸度降低", "D 糖份降低"] },
+                { questionNumber: "4", questionText: "产自凉爽气候的红葡萄酒往往会:", options: ["A 单宁多", "B 单宁少", "C 酒精度高", "D 酒体饱满"] },
+                { questionNumber: "5", questionText: "下面哪种方法不会浓缩葡萄内的糖分", options: ["A 贵腐菌", "B 额外成熟期", "C 有机栽培", "D 天然冰冻"] },
+                { questionNumber: "6", questionText: "下列哪种黑葡萄不是皮薄的:", options: ["A 黑皮诺", "B 内比奥罗", "C 歌海娜", "D 赤霞珠"] },
+                { questionNumber: "7", questionText: "下列哪种红葡萄酒往往不是高单宁的:", options: ["A 桑娇维塞", "B 赤霞珠", "C 内比奥罗", "D 佳美"] },
+                { questionNumber: "8", questionText: "下列哪种红葡萄酒往往是紫色的:", options: ["A 薄若莱新酒", "B Rioja Gran Reserva", "C Barolo", "D Tawny port"] },
+                { questionNumber: "9", questionText: "下列哪种红葡萄酒往往是低酸度的:", options: ["A 科维纳", "B 歌海娜", "C 丹魄", "D 马尔贝克"] },
+                { questionNumber: "10", questionText: "下列哪种葡萄品种适合凉爽到温和气候:", options: ["A 歌海娜", "B 黑皮诺", "C 金粉黛", "D 西拉"] },
+                { questionNumber: "11", questionText: "下列哪种红葡萄酒往往有草本味:", options: ["A 佳美娜", "B 金粉黛", "C 马尔贝克", "D 蒙特普齐亚诺"] },
+                { questionNumber: "12", questionText: "下列哪种红葡萄酒往往是高酒精的:", options: ["A 佳美", "B 赛美容", "C 赤霞珠", "D 黑皮诺"] },
+                { questionNumber: "13", questionText: "下列哪种红葡萄酒往往呈现黑色果味的:", options: ["A 赤霞珠", "B 内比奥罗", "C 黑皮诺", "D 皮诺塔吉"] },
+                { questionNumber: "14", questionText: "下列哪种红葡萄酒可能有薄荷、桉树、黑加仑、黑樱桃的味道:", options: ["A 赤霞珠", "B 黑皮诺", "C 马尔贝克", "D 内比奥罗"] },
+                { questionNumber: "15", questionText: "下列哪种红葡萄酒可能有草莓、红李子、白胡椒、甘草的味道:", options: ["A 美乐", "B 桑娇维塞", "C 西拉", "D 歌海娜"] },
+                { questionNumber: "16", questionText: "下列哪种白葡萄酒往往使用橡木桶的:", options: ["A 卡尔卡耐卡(garganega)", "B 雷司令", "C 柯提斯（cortese)", "D 霞多丽"] },
+                { questionNumber: "17", questionText: "下列哪种白葡萄酒是最不可能使用新橡木桶的:", options: ["A 霞多丽", "B 雷司令", "C 长相思", "D 白诗南"] },
+                { questionNumber: "18", questionText: "下列哪种白葡萄酒往往是轻酒体的:", options: ["A 霞多丽", "B 柯蒂斯", "C 白诗南", "D 琼瑶浆"] },
+                { questionNumber: "19", questionText: "下列哪种白葡萄酒容易受贵腐菌影响:", options: ["A 霞多丽", "B 阿尔巴利诺", "C 柯提斯(cortese)", "D 赛美容"] },
+                { questionNumber: "20", questionText: "下列哪种红葡萄酒往往呈现红色果味的:", options: ["A 西拉", "B 佳美娜", "C 歌海娜", "D 马尔贝克"] },
+                { questionNumber: "21", questionText: "White Zinfandel (白金粉黛) 是什么类型的葡萄酒", options: ["A 白葡萄酒", "B 红葡萄酒", "C 桃红葡萄酒", "D 加强酒"] },
+                { questionNumber: "22", questionText: "下列哪款酒会使用风干法:", options: ["A Valpolicella DOC", "B Amarone della Valpolicella DOCG", "C barolo", "D Chianti"] },
+                { questionNumber: "23", questionText: "下列哪个是白葡萄品种:", options: ["A 灰皮诺", "B 西拉", "C 马尔贝克", "D 黑皮诺"] },
+                { questionNumber: "24", questionText: "质量优秀的赤霞珠葡萄酒会有以下哪种香气", options: ["A 雪松、黑李子、森林地表", "B 青椒、红李子、覆盆子", "C 红樱桃、皮革、花丛", "D 黑莓、香辛料、巧克力"] },
+                { questionNumber: "25", questionText: "为什么Eiswein葡萄酒能获取高价格", options: ["A 需要特定的天气条件才行,并非每年都能生产", "B 需要大量劳动力才能采收", "C 产量很小", "D 以上都是"] },
+                { questionNumber: "26", questionText: "刚刚成熟(成熟度低)的雷司令会有什么味道", options: ["A 苹果、柠檬", "B 桃、杏", "C 芒果、菠萝", "D 汽油、蜂蜜"] },
+                { questionNumber: "27", questionText: "以下对于Beaujolais AOC描述正确的是", options: ["A 该AOC 涵盖整个薄若来产区", "B 葡萄主要生长于南部平坦肥沃的葡萄园", "C 高产量葡萄藤,能生产酒体最轻盈、口感最简单的葡萄酒", "D 以上都是"] },
+                { questionNumber: "28", questionText: "下列哪个是波尔多左岸的产区", options: ["A Carneros", "B Saint-Émilion", "C Pauillac", "D Pomerol"] },
+                { questionNumber: "29", questionText: "下列哪个是波尔多右岸的产区", options: ["A Saint-Émilion", "B Médoc", "C Pauillac", "D Graves"] },
+                { questionNumber: "30", questionText: "下列哪个产区的黑皮诺葡萄酒最好", options: ["A Barossa Valley", "B Casablanca", "C Pomerol", "D Rioja"] },
+                { questionNumber: "31", questionText: "下列哪个产区的黑皮诺葡萄酒最好", options: ["A Barossa Valley", "B Hunter Valley", "C Clare Valley", "D Yarra Valley"] },
+                { questionNumber: "32", questionText: "歌海娜一般种植在哪个国家?", options: ["A 西班牙", "B 美国", "C 新西兰", "D 意大利"] },
+                { questionNumber: "33", questionText: "金粉黛(Zinfandel)主要种植在哪个国家", options: ["A 美国", "B 西班牙", "C 澳大利亚", "D 智利"] },
+                { questionNumber: "34", questionText: "桑娇维塞(Sangiovese)主要种植在哪个产区", options: ["A 基安蒂", "B 巴罗洛", "C 巴巴莱斯科", "D 威尼托"] },
+                { questionNumber: "35", questionText: "下列哪个产区不适合种植黑皮诺", options: ["A Casablanca Valley", "B Nuits-Saint-Georges", "C Beaune", "D Barolo"] },
+                { questionNumber: "36", questionText: "皮诺塔吉(Pinotage)主要种植在哪个国家", options: ["A 法国", "B 智利", "C 南非", "D 奥地利"] },
+                { questionNumber: "37", questionText: "佳美娜(Carmenere) 主要种植在哪个国家", options: ["A 智利", "B 法国", "C 奥地利", "D 意大利"] },
+                { questionNumber: "38", questionText: "蒙特普齐亚诺(Montelpulciano) 主要种植在哪个国家", options: ["A 法国", "B 美国", "C 意大利", "D 智利"] },
+                { questionNumber: "39", questionText: "黑皮诺主要种植在哪个产区", options: ["A 波尔多", "B 卢瓦尔河", "C 法国南部", "D 勃艮第"] },
+                { questionNumber: "40", questionText: "下列哪个不是波尔多左岸的产区", options: ["A Graves", "B Saint-Émilion", "C Pessac-Léognan", "D Pauillac"] },
+                { questionNumber: "41", questionText: "灰皮诺主要种植在以下哪个产区", options: ["A 阿尔萨斯", "B 罗纳河", "C 波尔多", "D 卢瓦尔河"] },
+                { questionNumber: "42", questionText: "意大利的普利米提沃主要种植在哪个产区", options: ["A 皮埃蒙特", "B 基安蒂", "C 威尼托", "D 普利亚"] },
+                { questionNumber: "43", questionText: "起泡葡萄酒中的气泡是溶解在酒中的", options: ["A 氧气", "B 二氧化碳", "C 氮气", "D 空气"] },
+                { questionNumber: "44", questionText: "下列哪个是基酒的典型风格", options: ["A 干型,低酸度,低酒精度", "B 干型,高酸度,高酒精度", "C 干型,高酸度,低酒精度", "D 甜型,高酸度,低酒精度"] },
+                { questionNumber: "45", questionText: "下列哪个不是酿造香槟的主要品种", options: ["A 霞多丽", "B 黑皮诺", "C 莫尼耶", "D 长相思"] },
+                { questionNumber: "46", questionText: "下列哪个是酿造阿斯蒂法的主要品种", options: ["A 莫斯卡托", "B 格雷拉", "C 长相思", "D 霞多丽"] },
+                { questionNumber: "47", questionText: "下列哪个是将酵母从瓶中移除的过程", options: ["A 二次发酵", "B 酵母自溶", "C 吐泥", "D 转瓶"] },
+                { questionNumber: "48", questionText: "以下由单一优异年份中最高质量的葡萄酒酿制而成,瓶中陈年的是", options: ["A 珍藏宝石红波特", "B 宝石红波特", "C 年份波特", "D 茶色波特"] },
+                { questionNumber: "49", questionText: "下列哪个是酒体饱满的红葡萄酒侍酒温度", options: ["A 6-8°", "B 7-13°", "C 13-18°", "D 15-18°"] },
+                { questionNumber: "50", questionText: "辣的食物会使葡萄酒尝起来", options: ["A 果味不那么明显", "B 酸度增加", "C 酒体更浓郁", "D 酒精感更明显"] }
+            ],
+            exam2: [
+                { questionNumber: "1", questionText: "下列哪种物质果肉里没有?", options: ["A 糖分", "B 酸度", "C 单宁", "D 风味物质"] },
+                { questionNumber: "2", questionText: "下列哪个不是葡萄藤生长所必需的?", options: ["A 氧气", "B 热量", "C 阳光", "D 水分"] },
+                { questionNumber: "3", questionText: "葡萄在转色期开始:", options: ["A 变大", "B 糖份降低", "C 酸度降低", "D 单宁降低"] },
+                { questionNumber: "4", questionText: "产自凉爽气候的葡萄酒往往会:", options: ["A 酸度高", "B 糖份高", "C 酒精度高", "D 酒体饱满"] },
+                { questionNumber: "5", questionText: "下面哪种方法不会浓缩葡萄内的糖分", options: ["A 灌溉", "B 贵腐菌", "C 天然冰冻", "D 额外成熟期"] },
+                { questionNumber: "6", questionText: "下列哪个术语是属于西班牙使用的?", options: ["A Kabinett", "B Reserva", "C AOC", "D DOCG"] },
+                { questionNumber: "7", questionText: "下列哪种红葡萄酒往往是颜色浅的:", options: ["A Pauillac AOC", "B Hermitage AOC", "C Cote Rotie AOC", "D Cotes du Rhone AOC"] },
+                { questionNumber: "8", questionText: "下列哪种黑葡萄是皮薄的:", options: ["A 马尔贝克", "B 金粉黛", "C 黑皮诺", "D 佳美娜"] },
+                { questionNumber: "9", questionText: "下列哪种红葡萄酒往往是颜色深的:", options: ["A 内比奥罗", "B 赤霞珠", "C 黑皮诺", "D 歌海娜"] },
+                { questionNumber: "10", questionText: "下列哪种红葡萄酒往往是高单宁的:", options: ["A 歌海娜", "B 黑皮诺", "C 内比奥罗", "D 佳美娜"] },
+                { questionNumber: "11", questionText: "下列哪种红葡萄酒往往是石榴红色的:", options: ["A Bourgogne rouge", "B Cote du Rhone Village", "C Rioja Gran Reserva", "D Beaujolais"] },
+                { questionNumber: "12", questionText: "下列哪种红葡萄酒往往是高酸度的:", options: ["A 黑皮诺", "B 赤霞珠", "C 内比奥罗", "D 以上全是"] },
+                { questionNumber: "13", questionText: "下列哪种红葡萄酒往往是轻酒体的:", options: ["A 佳美", "B 赤霞珠", "C 金粉黛", "D 西拉"] },
+                { questionNumber: "14", questionText: "下列哪种葡萄品种适合温暖气候:", options: ["A 歌海娜", "B 黑皮诺", "C 雷司令", "D 长相思"] },
+                { questionNumber: "15", questionText: "下列哪种红葡萄酒往往呈现黑色果味的:", options: ["A 歌海娜", "B 内比奥罗", "C 巴贝拉", "D 西拉"] },
+                { questionNumber: "16", questionText: "下列哪种红葡萄酒可能有草莓、红樱桃、黑莓、黑李子、橡木的味道:", options: ["A 内比奥罗", "B 丹魄", "C 长相思", "D 佳美"] },
+                { questionNumber: "17", questionText: "下列哪种白葡萄酒最有可能使用橡木桶的:", options: ["A 琼瑶浆", "B 雷司令", "C 白诗南", "D 阿尔巴利诺"] },
+                { questionNumber: "18", questionText: "下列哪种白葡萄酒往往是重酒体的:", options: ["A 琼瑶浆", "B 雷司令", "C 卡尔卡耐卡(garganega)", "D 阿尔巴利诺"] },
+                { questionNumber: "19", questionText: "下列哪种白葡萄酒容易受贵腐菌影响:", options: ["A 霞多丽", "B 福尔明", "C 阿尔巴利诺", "D 维欧尼"] },
+                { questionNumber: "20", questionText: "下列哪种白葡萄酒往往是颜色浅的:", options: ["A Auslese", "B Meursault", "C Chablis", "D TBA"] },
+                { questionNumber: "21", questionText: "下列哪种白葡萄酒最有可能是甜型的:", options: ["A 阿尔巴利诺", "B 维欧尼", "C 菲亚诺Fiano", "D 白诗南"] },
+                { questionNumber: "22", questionText: "下列哪种不是意大利的葡萄品种:", options: ["A 内比奥罗", "B 桑娇维塞", "C 皮诺塔吉", "D 巴贝拉"] },
+                { questionNumber: "23", questionText: "下列哪个是红葡萄品种:", options: ["A 赤霞珠", "B 霞多丽", "C 赛美容", "D 长相思"] },
+                { questionNumber: "24", questionText: "以下对于Beaujolais Villages AOC描述正确的是", options: ["A 来自薄若莱北部的一些村庄", "B 较不肥沃的石质土壤,让葡萄藤的产量自然受到控制", "C 葡萄酒通常具有更多的味道浓度和酒体", "D 以上都是"] },
+                { questionNumber: "25", questionText: "下列哪款酒没有最低陈年要求限制", options: ["A Joven", "B Crianza", "C Reserva", "D Gran Reserva"] },
+                { questionNumber: "26", questionText: "温和产区的霞多丽葡萄酒往往会有以下哪种香气", options: ["A 青苹果、柠檬", "B 桃子、杏", "C 香蕉、櫻桃酒", "D 荔枝、蜂蜜"] },
+                { questionNumber: "27", questionText: "博若莱的佳美往往会有什么香气", options: ["A 香蕉、糖果", "B 芦笋、豌豆", "C 蜂蜜、蜜饯", "D 面包、黄油"] },
+                { questionNumber: "28", questionText: "澳大利亚的雷司令主要种植在哪个产区", options: ["A 玛格丽特河", "B 猎人谷", "C 伊顿谷", "D 亚拉河谷"] },
+                { questionNumber: "29", questionText: "南非的黑皮诺主要种植在哪个产区", options: ["A 卢瓦尔河", "B 沃克湾", "C 玛格丽特河", "D 霍克湾"] },
+                { questionNumber: "30", questionText: "Barolo唯一允许使用的葡萄品种是", options: ["A 内比奥罗", "B 桑娇维塞", "C 赤霞珠", "D 科维纳"] },
+                { questionNumber: "31", questionText: "智利的黑皮诺主要种植在哪个产区", options: ["A 中央谷", "B 麦坡谷", "C 玛格丽特河", "D 卡萨布兰卡谷"] },
+                { questionNumber: "32", questionText: "质量优秀的雷司令可能来自哪个产区:", options: ["A 卢瓦尔河", "B 摩泽尔", "C 霍克湾", "D 桑赛尔"] },
+                { questionNumber: "33", questionText: "质量最优秀的桑娇维塞可能来自哪个产区", options: ["A 基安蒂(chianti)", "B 巴罗洛(barolo)", "C 托斯卡纳(tuscany)", "D 蒙塔奇诺布鲁奈诺(brunello di montalcino)"] },
+                { questionNumber: "34", questionText: "质量优秀的金粉黛可能来自哪个产区:", options: ["A 基安蒂", "B 托斯卡纳", "C 普利亚", "D 西西里岛"] },
+                { questionNumber: "35", questionText: "下列哪个产区不适合种植黑皮诺", options: ["A Gevrey-Chambertin", "B Nuits-Saint-Georges", "C Chateauneuf du Pape", "D Beaune"] },
+                { questionNumber: "36", questionText: "下列哪个不是波尔多左岸的产区", options: ["A Pauillac", "B Haut-Médoc", "C Pessac-Léognan", "D Pomerol"] },
+                { questionNumber: "37", questionText: "佳美(Gamay)主要种植在哪个产区", options: ["A 波尔多", "B 卢瓦尔河", "C 博若莱", "D 法国南部"] },
+                { questionNumber: "38", questionText: "下列哪个产区不擅长种植黑皮诺", options: ["A Barossa Valley", "B Carneros", "C Sonoma", "D Walker Bay"] },
+                { questionNumber: "39", questionText: "下列哪个是波尔多右岸的产区", options: ["A Haut-Médoc", "B Pomerol", "C Pessac-Léognan", "D Margaux"] },
+                { questionNumber: "40", questionText: "下列哪个是酿造干型雪莉酒的主要品种", options: ["A 霞多丽", "B 帕诺米诺", "C 雷司令", "D 佩德罗-希梅内斯"] },
+                { questionNumber: "41", questionText: "哪种气候是生产低酒精度、高酸度葡萄酒的理想条件", options: ["A 凉爽气候", "B 温暖气候", "C 温和气候", "D 炎热气候"] },
+                { questionNumber: "42", questionText: "下列表示无年份的术语是", options: ["A Brut", "B Non-vintage", "C Traditional Method", "D Méthode Cap Classique"] },
+                { questionNumber: "43", questionText: "普罗塞克是哪个地方通常使用罐中发酵法酿造的起泡酒", options: ["A 意大利西北部", "B 意大利南部", "C 意大利中部", "D 意大利东北部"] },
+                { questionNumber: "44", questionText: "下列符合宝石红波特的是", options: ["A 葡萄酒将在索莱拉系统里经历氧化陈年的过程", "B 颜色很深,多果味。经过加强后,装瓶适饮前经过了大容器陈年", "C 并非每年都能酿制,只会在最好的年份酿造", "D 酿造时有一层厚厚的酒花,漂浮在酒液上面"] },
+                { questionNumber: "45", questionText: "下列哪个不是储存葡萄酒的必要条件", options: ["A 凉爽、恒温", "B 避免强光直射", "C 橡木塞的酒需要水平放置", "D 通风"] },
+                { questionNumber: "46", questionText: "下列哪个是酒体饱满的白葡萄酒侍酒温度", options: ["A 6-8°", "B 7-10°", "C 10-13°", "D 15-18°"] },
+                { questionNumber: "47", questionText: "食物中的甜度会使干型葡萄酒尝起来", options: ["A 果味更浓", "B 果味缺乏", "C 更甜", "D 更苦"] },
+                { questionNumber: "48", questionText: "食物中咸味会使葡萄酒尝起来", options: ["A 酸度更尖锐", "B 果味变淡", "C 酸度增加", "D 增加果味,软化红葡萄酒中的单宁"] },
+                { questionNumber: "49", questionText: "下列属于葡萄酒损害的是", options: ["A 软木塞缺陷", "B 瓶塞缺陷", "C 热损害", "D 以上都是"] },
+                { questionNumber: "50", questionText: "食物中酸度过高且葡萄酒酸度较低,会使葡萄酒尝起来", options: ["A 缺乏果味", "B 甜度变低", "C 酒体变轻", "D 软化单宁"] }
+            ],
+            exam3: [
+                { questionNumber: "1", questionText: "Old Vine与下列哪个术语意思一致?", options: ["A Vendanges Tardives", "B Vieilles vignes", "C Vintage", "D Botrytis"] },
+                { questionNumber: "2", questionText: "下列哪个不是葡萄藤生长所必需的?", options: ["A 养分", "B 水分", "C 阳光", "D 风"] },
+                { questionNumber: "3", questionText: "葡萄在转色期开始:", options: ["A 颜色变淡", "B 糖份升高", "C 酸度升高", "D 单宁降低"] },
+                { questionNumber: "4", questionText: "产自温暖气候的葡萄酒往往会:", options: ["A 酸度高", "B 糖份低", "C 酒精度低", "D 酒体饱满"] },
+                { questionNumber: "5", questionText: "下列哪种红葡萄酒往往是高单宁的:", options: ["A 佳美", "B 黑皮诺", "C 歌海娜", "D 内比奥罗"] },
+                { questionNumber: "6", questionText: "下列哪种黑葡萄是厚皮的:", options: ["A 歌海娜", "B 赤霞珠", "C 黑皮诺", "D 内比奥罗"] },
+                { questionNumber: "7", questionText: "下列哪种红葡萄酒往往是颜色浅的:", options: ["A Priorat", "B Napa Valley", "C Bourgogne", "D Barossa Valley"] },
+                { questionNumber: "8", questionText: "下列哪种红葡萄酒最可能有香辛料、黑樱桃的、甘草、黑胡椒的味道:", options: ["A 黑皮诺", "B 佳美娜", "C 西拉", "D 皮诺塔吉"] },
+                { questionNumber: "9", questionText: "下列哪种红葡萄酒可能有红樱桃、玫瑰、药草的味道:", options: ["A 内比奥罗", "B 赤霞珠", "C 西拉", "D 马尔贝克"] },
+                { questionNumber: "10", questionText: "下列哪种白葡萄酒往往是轻酒体的:", options: ["A 意大利灰皮诺", "B 阿尔萨斯灰皮诺", "C 琼瑶浆", "D 维欧尼"] },
+                { questionNumber: "11", questionText: "下列哪种白葡萄酒容易受贵腐菌影响:", options: ["A 柯提斯(cortese)", "B 阿尔巴利诺(albarino)", "C 白诗南", "D 霞多丽"] },
+                { questionNumber: "12", questionText: "下列哪种白葡萄酒往往是颜色浅的:", options: ["A Kabinett", "B Sauternes", "C Auslese", "D Tokaji Aszu"] },
+                { questionNumber: "13", questionText: "下列哪种不是意大利的常见白葡萄品种:", options: ["A 卡尔卡耐卡(garganega)", "B 菲亚诺Fiano", "C 阿尔巴利诺albarino", "D 柯提斯cortese"] },
+                { questionNumber: "14", questionText: "成熟度低的白诗南可能会有什么香气", options: ["A 蜂蜜、奶油", "B 芒果、菠萝", "C 桃子、香草、面包", "D 苹果、柠檬"] },
+                { questionNumber: "15", questionText: "典型的阿尔巴利诺葡萄酒会有以下哪种香气", options: ["A 面包、黄油", "B 青椒、芦笋", "C 柠檬、西柚", "D 汽油、矿石"] },
+                { questionNumber: "16", questionText: "质量很好的霞多丽在瓶中陈年会发展出什么气味:", options: ["A 汽油、蜂蜜", "B 橘皮酱、桂皮", "C 蜂蜜、姜糖", "D 榛子、蘑菇"] },
+                { questionNumber: "17", questionText: "酿造中常使用二氧化碳浸渍法的葡萄是", options: ["A 梅洛", "B 佳美", "C 马尔贝克", "D 佳美娜"] },
+                { questionNumber: "18", questionText: "通常展现最浓郁的二类和三类香气的是哪款酒", options: ["A Gran Reserva", "B classico", "C Crianza", "D Joven"] },
+                { questionNumber: "19", questionText: "下列属于意大利的红葡萄酒品种是", options: ["A 柯提斯", "B 巴贝拉", "C 佳美", "D 赤霞珠"] },
+                { questionNumber: "20", questionText: "下列哪项符合对金粉黛正确的描述", options: ["A 黑葡萄品种,整串葡萄当中有些会在其他葡萄完全成熟前变成葡萄干", "B 白葡萄品种,需要温暖气候才能成熟", "C 黑葡萄品种,在法国和意大利都有种植", "D 白葡萄品种,葡萄酒通常为粉红色,具有简单的红色水果香气"] },
+                { questionNumber: "21", questionText: "下列哪项符合对赛美容正确的描述", options: ["A 适合年轻时饮用不适合陈年", "B 是佩萨克-雷奥良唯一允许种植的白葡萄品种", "C 果皮厚,不易受到贵腐菌感染", "D 是苏玳重要的葡萄品种"] },
+                { questionNumber: "22", questionText: "下列哪项符合对霞多丽正确的描述", options: ["A 最好的霞多丽葡萄酒来自波尔多", "B 酿造中往往不使用工艺", "C 只能种植在温暖气候中", "D 可以酿造不同风格与质量的干型白葡萄酒"] },
+                { questionNumber: "23", questionText: "下列哪项符合对皮诺塔吉正确的描述", options: ["A 是为南非温暖干燥的气候而培育出来的,与灰皮诺密切相关", "B 是为南非温暖干燥的气候而培育出来的,与黑皮诺密切相关", "C 与橡木接触,则可产生浓郁的面团、饼干和黄油的香气", "D 风格为多果味、酒体中等到饱满,带着浓郁的绿色水果香气"] },
+                { questionNumber: "24", questionText: "下列哪项符合对维蒂奇诺正确的描述", options: ["A 风格简单、多果味、不适合陈年", "B 风格复杂、二类香气为主、适合陈年", "C 通常为甜型,具有饱满酒体", "D 通常为干型,具有饱满酒体"] },
+                { questionNumber: "25", questionText: "下列哪个是起泡酒的侍酒温度", options: ["A 6-8°", "B 6-10°", "C 13-18°", "D 15-18°"] },
+                { questionNumber: "26", questionText: "酿造Gavi最知名的品种是", options: ["A 科维纳corvina", "B 卡尔卡耐卡garganega", "C 普罗塞克prosecco", "D 柯提斯cortese"] },
+                { questionNumber: "27", questionText: "下列哪个是梅洛可以和赤霞珠混合的理由", options: ["A 帮助软化赤霞珠的高单宁和高酸度", "B 使酒款可以在早期阶段饮用", "C 梅洛将给予混合葡萄酒以李子的味道", "D 以上都是"] },
+                { questionNumber: "28", questionText: "下列哪个是波尔多左岸的产区", options: ["A Margaux", "B Saint-Émilion", "C Pomerol", "D Coonawarra"] },
+                { questionNumber: "29", questionText: "下列哪个产区的黑皮诺葡萄酒最好", options: ["A Gevrey-Chambertin", "B Pessac-Léognan", "C Pouilly Fume", "D Pouilly Fuisse"] },
+                { questionNumber: "30", questionText: "下列哪个产区是普里米蒂沃(Primitivo)的产区", options: ["A Tasmania", "B Tuscany", "C Navarra", "D Puglia"] },
+                { questionNumber: "31", questionText: "教皇新堡位于哪个产区", options: ["A 勃艮第", "B 罗讷河北部", "C 罗纳河南部", "D 卢瓦尔河"] },
+                { questionNumber: "32", questionText: "马尔贝克(malbec)主要种植在哪个国家", options: ["A 澳大利亚", "B 阿根廷", "C 美国", "D 智利"] },
+                { questionNumber: "33", questionText: "西拉(Syrah/Shiraz)主要种植在哪个国家", options: ["A 澳大利亚", "B 意大利", "C 奥地利", "D 匈牙利"] },
+                { questionNumber: "34", questionText: "霞多丽主要种植在哪个产区", options: ["A 夏布利", "B 法国南部", "C 博纳丘", "D 以上都是"] },
+                { questionNumber: "35", "questionText": "质量优秀的赤霞珠可能来自哪个产区:", "options": ["A 波亚克", "B 教皇新堡", "C 圣埃美隆", "D 波美侯"] },
+                { questionNumber: "36", "questionText": "质量优秀的佳美可能来自哪个产区:", "options": ["A 波尔多", "B 夜丘", "C 博若莱新酒", "D 博若莱特级村庄"] },
+                { questionNumber: "37", "questionText": "质量优秀的歌海娜可能来自哪个产区:", "options": ["A 教皇新堡", "B 格里叶堡", "C 下海湾", "D 门多萨"] },
+                { questionNumber: "38", "questionText": "质量优秀的黑皮诺可能来自哪个产区:", "options": ["A 热夫雷-香贝丹产区", "B 夜圣乔治", "C 夜丘", "D 以上都是"] },
+                { questionNumber: "39", "questionText": "下列哪款葡萄酒最淡雅细致", "options": ["A Auslese", "B Trockenbeerenauslese", "C Kabinett", "D Spätlese"] },
+                { questionNumber: "40", "questionText": "猎人谷的白葡萄是什么品种", "options": ["A 霞多丽", "B 雷司令", "C 长相思", "D 赛美容"] },
+                { questionNumber: "41", "questionText": "卢瓦尔河的长相思葡萄酒会有以下哪种香气", "options": ["A 绿色水果、青草与湿石头味", "B 黄色水果、面包与橡木桶味", "C 菠萝、芒果、荔枝", "D 柑橘、汽油、蜂蜜"] },
+                { questionNumber: "42", "questionText": "法国波尔多种植面积最广的品种是", "options": ["A 赤霞珠", "B 品丽珠", "C 梅洛", "D 霞多丽"] },
+                { questionNumber: "43", "questionText": "下列哪个符合普罗塞克的风格", "options": ["A 有苹果、蜜瓜的香气", "B 轻盈或中度酒体,有苹果、蜜瓜的香气", "C 干型或近乎干,中度或饱满酒体,有面包、黄油的香气", "D 干型或近乎干,轻盈或中度酒体"] },
+                { questionNumber: "44", "questionText": "下列哪个雪莉酒只经过了生物型陈年", "options": ["A 奥罗露索", "B 阿蒂提亚", "C 菲诺", "D 以上都不是"] },
+                { questionNumber: "45", "questionText": "下列表示传统法的术语是", "options": ["A Brut", "B Non-vintage", "C Traditional Method", "D Méthode Cap Classique"] },
+                { questionNumber: "46", "questionText": "香槟标示有Non-Vintage (NV),意味着", "options": ["A 基酒由同一品种酿造", "B 基酒来自同一的年份", "C 基酒来自不同的年份", "D 基酒由不同品种酿造"] },
+                { questionNumber: "47", "questionText": "对于产生二次发酵的过程描述正确的是", "options": ["A 把糖和酵母加入干型基酒中", "B 酵母将糖份转化为酒精和CO2", "C 产生的酒精将葡萄酒的酒精度提高了1.5%", "D 以上都是"] },
+                { questionNumber: "48", "questionText": "油腻的食物会使葡萄酒尝起来", "options": ["A 果味不那么明显", "B 酸度不那么明显", "C 酒体更浓郁", "D 甜度更明显"] },
+                { questionNumber: "49", "questionText": "食物中的甜度会使干型葡萄酒尝起来", "options": ["A 缺乏果味", "B 更甜", "C 果味更浓郁", "D 酸度降低"] },
+                { questionNumber: "50", "questionText": "下列符合茶色波特的是", "options": ["A 颜色是茶色,葡萄酒也发展出了果干和充分的氧化特征", "B 具有煮熟的黑色水果(黑櫻桃、黑莓)的味道,有时还有黑胡椒的味道", "C 只能由单一品种酿造", "D 并非每年每年都能酿制,只会在最好的年份酿造"] }
+            ],
+            exam4: [
+                { questionNumber: "1", questionText: "下列哪个术语是属于德国使用的?", options: ["A Kabinett", "B Reserva", "C Vendanges Tardives", "D DOCG"] },
+                { questionNumber: "2", questionText: "vintage\"的含义是?", options: ["A 葡萄酒装瓶年份", "B 葡萄树种植年份", "C 葡萄采摘年份", "D 酿酒师的出身年份"] },
+                { questionNumber: "3", questionText: "下列哪个术语是“晚收“的意思?", options: ["A Vendanges tardives", "B Botrytis", "C Kabinett", "D Vieilles vignes"] },
+                { questionNumber: "4", questionText: "下列哪种红葡萄酒往往是石榴红色的:", options: ["A Joven", "B Barolo", "C Margaret River", "D Hawke's Bay"] },
+                { questionNumber: "5", questionText: "下列哪种红葡萄酒往往是轻酒体的:", options: ["A 金粉黛", "B 马尔贝克", "C 赤霞珠", "D 白金粉黛"] },
+                { questionNumber: "6", questionText: "下列哪项符合对桑娇维塞正确的描述", options: ["A 高单宁、高酸度,质量好的通常会在橡木桶中陈年并添加复杂味道", "B 以巴罗洛中生产的桑娇维塞最为著名", "C 经典基安蒂不需要在橡木桶中陈年", "D 桑娇维塞不会和其它品种混酿"] },
+                { questionNumber: "7", questionText: "下列哪项符合对蒙特普齐亚诺正确的描述", options: ["A 以意大利西北部的蒙特普齐亚诺最为闻名", "B 通常酿造高产量的廉价葡萄酒,口感简单、多果味", "C 通常酿造低产量的高质量葡萄酒,口感复杂、多三级香气", "D 以意大利东北部的蒙特普齐亚诺最为闻名"] },
+                { questionNumber: "8", questionText: "下列哪项符合对丹魄正确的描述", options: ["A 是智利最具声望的黑葡萄品种", "B 陈年时不适合使用橡木桶", "C 丹魄不能与其他品种混酿", "D 多样化的葡萄品种,能做出简单的,也能做口感复杂适合陈年的葡萄酒"] },
+                { questionNumber: "9", "questionText": "下列哪项符合对西拉正确的描述", "options": ["A Syrah 与 Shiraz 不是同一品种", "B 葡萄酒往往是酸度高,高点宁,黑色水果风味", "C 果皮薄,果粒小,需要温和到温暖的气候才能完全成熟", "D 该品种在澳大利亚种植面积小"] },
+                { questionNumber: "10", "questionText": "下列哪项符合对阿尔巴利诺正确的描述", "options": ["A 通常为干型,中等酒体,不一定有橡木味", "B 通常酒体饱满浓郁,酒精高", "C 最有名的阿尔巴利诺产自意大利", "D 通常为干型,酸度低,从不使用橡木桶"] },
+                { questionNumber: "11", "questionText": "下列哪项符合对灰皮诺正确的描述", "options": ["A 价格低廉的灰皮诺往往在橡木桶中发酵以增加复杂性", "B 风格较为浓郁、酒体饱满的酒可以在瓶中随时间发展出生姜和蜂蜜的味道", "C IGT级别的灰皮诺往往是高品质的葡萄酒", "D 只能做干型葡萄酒"] },
+                { questionNumber: "12", "questionText": "下列葡萄酿造时通常使用橡木的是", "options": ["A 雷司令(riesling)", "B 柯提斯(cortese)", "C 霞多丽(chardonnay)", "D 琼瑶浆(gewurztraminer)"] },
+                { questionNumber: "13", "questionText": "凉爽产区的霞多丽葡萄酒会有以下哪种香气", "options": ["A 青苹果、柠檬", "B 桃子、梨", "C 芒果、菠萝", "D 蜂蜜、姜糖"] },
+                { questionNumber: "14", "questionText": "下列哪种不是意大利的红葡萄品种:", "options": ["A 桑娇维塞", "B 内比奥罗", "C 马尔贝克", "D 蒙特普齐亚诺"] },
+                { questionNumber: "15", "questionText": "下列哪种白葡萄酒最有可能是甜型的:", "options": ["A 霞多丽", "B 赛美容", "C 柯蒂斯", "D 维欧尼"] },
+                { questionNumber: "16", "questionText": "下列哪种红葡萄酒往往是石榴红色的:", "options": ["A Bordeaux Supérieur", "B Barbaresco", "C Tokaji Aszú", "D Central Valley"] },
+                { questionNumber: "17", "questionText": "下列哪项符合对福尔明正确的描述", "options": ["A 是奥地利种植最为广泛的白葡萄品种", "B 是酿制托卡伊甜酒的主要品种", "C 通常酿造干型,简单易饮的葡萄酒", "D 往往不与其它葡萄品种混酿"] },
+                { questionNumber: "18", "questionText": "下列哪项符合对梅洛正确的描述", "options": ["A 梅洛只能单一品种酿造", "B 风格的梅洛可受益于橡木桶陈年", "C 的风格梅洛需要延长陈年期", "D 产区在波尔多的左岸"] },
+                { questionNumber: "19", "questionText": "下列哪项符合对马尔贝克正确的描述", "options": ["A 是阿根廷最重要的黑葡萄品种,原产于意大利", "B 通常会在新橡木桶中陈年使葡萄酒变得柔软并添加辛香料的味道", "C 通常会在橡木桶中陈年,适合年轻时饮用", "D 适合生长在凉爽的气候中"] },
+                { questionNumber: "20", "questionText": "下列哪项符合对巴贝拉正确的描述", "options": ["A 风格单一,只有多果味但不具有橡木味的类型", "B 风格单一,只有经橡木桶陈年并具复杂性的类型", "C 单宁低,适合早饮,大多不适合陈年", "D 巴贝拉生长于意大利东北部的威尼托"] },
+                { questionNumber: "21", "questionText": "法国的雷司令主要种植在哪个产区", "options": ["A 波尔多", "B 阿尔萨斯", "C 卢瓦尔河", "D 夏布利"] },
+                { questionNumber: "22", "questionText": "澳大利亚的赛美容主要种植在哪个产区", "options": ["A 玛格丽特河", "B 猎人谷", "C 伊顿谷", "D 克莱尔谷"] },
+                { questionNumber: "23", "questionText": "皮诺塔吉与哪个品种密切相关", "options": ["A 灰皮诺", "B 黑皮诺", "C 霞多丽", "D 西拉"] },
+                { questionNumber: "24", "questionText": "歌海娜在纳瓦拉产区酿造什么类型的葡萄酒闻名", "options": ["A 干型桃红葡萄酒", "B 半甜桃红葡萄酒", "C 甜型红葡萄酒", "D 干型白葡萄酒"] },
+                { questionNumber: "25", "questionText": "主要种植在智利,其他国家少见的黑葡萄品种是", "options": ["A 赤霞珠", "B 梅洛", "C 佳美", "D 佳美娜"] },
+                { questionNumber: "26", "questionText": "质量特好的梅洛的典型风格是", "options": ["A 浓郁的黑色水果香气,低产量而完全成熟", "B 橡木桶陈年的烟熏与雪松香气", "C 有三类香气:果干、烟草", "D 以上都是"] },
+                { questionNumber: "27", "questionText": "质量优秀的梅洛可能来自哪个产区:", "options": ["A 教皇新堡", "B 波美侯", "C 两海之间", "D 格拉芙"] },
+                { questionNumber: "28", "questionText": "质量优秀的霞多丽可能来自哪个产区:", "options": ["A Gevrey Chambertin", "B 普里尼-蒙哈榭(puligny montrachet)", "C 桑赛尔(sancerre)", "D 普伊-芙美(pouilly fume)"] },
+                { questionNumber: "29", "questionText": "质量优秀的维欧尼可能来自哪个产区:", "options": ["A 教皇新堡(chateauneuf du pape)", "B 艾米塔吉(hermitage)", "C 孔得里约(condrieu)", "D 卢瓦尔河(loire)"] },
+                { questionNumber: "30", "questionText": "夏布利的霞多丽葡萄酒会有以下哪种香气", "options": ["A 青椒、芦笋、百香果", "B 苹果、柠檬、矿石", "C 桃、杏、梨、香草", "D 汽油、蜂蜜、矿石"] },
+                { questionNumber: "31", "questionText": "下列哪款葡萄酒受到了贵腐影响", "options": ["A Spätlese", "B Trockenbeerenauslese", "C Kabinett", "D Eiswein"] },
+                { questionNumber: "32", "questionText": "佳美娜葡萄酒可能来自哪个产区:", "options": ["A 法国南部", "B 中央山谷", "C 里奥哈", "D 皮埃蒙特"] },
+                { questionNumber: "33", "questionText": "内比奥罗(Nebbiolo)主要种植在哪个国家", "options": ["A 美国", "B 澳大利亚", "C 西班牙", "D 意大利"] },
+                { questionNumber: "34", "questionText": "西拉主要种植在哪个国家", "options": ["A 德国", "B 法国", "C 阿根廷", "D 意大利"] },
+                { questionNumber: "35", "questionText": "下列哪个品种会种植在教皇新堡", "options": ["A 内比奥罗", "B 歌海娜", "C 梅洛", "D 马尔贝克"] },
+                { questionNumber: "36", "questionText": "下列哪个不是波尔多左岸的产区", "options": ["A St Emilion", "B Margaux", "C Pessac-Léognan", "D Haut-Médoc"] },
+                { questionNumber: "37", "questionText": "澳大利亚的黑皮诺主要种植在哪个产区", "options": ["A 索诺玛", "B 沃克湾", "C 雅拉谷", "D 巴罗萨"] },
+                { questionNumber: "38", "questionText": "开普混合是哪个葡萄品种为主导的酒?", "options": ["A 西拉", "B 马尔贝克", "C 皮诺塔吉", "D 歌海娜"] },
+                { questionNumber: "39", "questionText": "质量优秀的赤霞珠可能来自哪个产区:", "options": ["A 梅多克", "B 玛歌", "C 波亚克", "D 以上都是"] },
+                { questionNumber: "40", "questionText": "维欧尼(viognier)主要种植在哪个国家", "options": ["A 意大利", "B 法国", "C 美国", "D 西班牙"] },
+                { questionNumber: "41", "questionText": "皮埃蒙特位于意大利哪个部分", options: ["A 意大利东北部", "B 意大利西北部", "C 意大利中部", "D 意大利南部"] },
+                { questionNumber: "42", "questionText": "下列哪个雪莉酒经过了氧化型陈年", options: ["A 奥罗露索", "B 阿蒂提亚", "C 菲诺", "D 以上都不是"] },
+                { questionNumber: "43", "questionText": "下列只在最好的年份“宣布“酿造的是", options: ["A 宝石红波特酒", "B 晚装瓶年份波特酒", "C 茶色波特", "D 年份波特"] },
+                { questionNumber: "44", "questionText": "下列表示开普传统法的术语是", options: ["A Brut", "B Non-vintage", "C Traditional Method", "D Méthode Cap Classique"] },
+                { questionNumber: "45", "questionText": "下列哪个决定葡萄酒最终甜度的过程", options: ["A 加糖", "B 酵母自溶", "C 基酒", "D 吐泥"] },
+                { questionNumber: "46", "questionText": "下列哪个是酿造普罗塞克的主要品种", options: ["A 科维纳", "B 柯蒂斯", "C 格雷拉", "D 霞多丽"] },
+                { questionNumber: "47", "questionText": "食物中的甜度会使干型葡萄酒尝起来", options: ["A 更酸", "B 更甜", "C 果味更浓郁", "D 酸度降低"] },
+                { questionNumber: "48", "questionText": "食物中鲜味过多会使葡萄酒尝起来", options: ["A 果味不那么突出", "B 果味更浓郁", "C 酸度变低", "D 酒体变饱满"] },
+                { questionNumber: "49", "questionText": "食物中甜味过多会使葡萄酒尝起来", options: ["A 变干涩、更酸", "B 果味更浓郁", "C 酸度变低", "D 酒体变饱满"] },
+                { questionNumber: "50", "questionText": "下列哪个香气不是橡木桶带来的", options: ["A 烤面包", "B 香草", "C 黄油", "D 焦炭"] }
+            ]
+        };
+
+        // Correct answers for exams. Exams not listed here will be considered as having no answers.
+        const correctAnswers = {
+            exam1: {
+                "1": "B", "2": "A", "3": "C", "4": "B", "5": "C", "6": "D", "7": "D", "8": "A", "9": "B", "10": "B",
+                "11": "A", "12": "C", "13": "A", "14": "A", "15": "D", "16": "D", "17": "B", "18": "B", "19": "D", "20": "C",
+                "21": "C", "22": "B", "23": "A", "24": "A", "25": "D", "26": "A", "27": "D", "28": "C", "29": "A", "30": "B",
+                "31": "D", "32": "A", "33": "A", "34": "A", "35": "D", "36": "C", "37": "A", "38": "C", "39": "D", "40": "B",
+                "41": "A", "42": "D", "43": "B", "44": "C", "45": "D", "46": "A", "47": "C", "48": "C", "49": "D", "50": "D"
+            },
+            exam2: {
+                "1": "C", "2": "A", "3": "C", "4": "A", "5": "A", "6": "B", "7": "D", "8": "C", "9": "B", "10": "C",
+                "11": "C", "12": "D", "13": "A", "14": "A", "15": "D", "16": "B", "17": "C", "18": "A", "19": "B", "20": "C",
+                "21": "D", "22": "C", "23": "A", "24": "D", "25": "A", "26": "B", "27": "A", "28": "C", "29": "B", "30": "A",
+                "31": "D", "32": "B", "33": "A", "34": "C", "35": "C", "36": "D", "37": "C", "38": "A", "39": "B", "40": "B",
+                "41": "A", "42": "B", "43": "D", "44": "B", "45": "D", "46": "C", "47": "B", "48": "D", "49": "D", "50": "A"
+            },
+            exam3: {
+                "1": "B", "2": "D", "3": "B", "4": "D", "5": "D", "6": "B", "7": "C", "8": "C", "9": "A", "10": "A",
+                "11": "C", "12": "A", "13": "C", "14": "D", "15": "C", "16": "D", "17": "B", "18": "A", "19": "B", "20": "A",
+                "21": "D", "22": "D", "23": "B", "24": "A", "25": "B", "26": "D", "27": "D", "28": "A", "29": "A", "30": "D",
+                "31": "C", "32": "B", "33": "A", "34": "D", "35": "A", "36": "D", "37": "A", "38": "D", "39": "C", "40": "D",
+                "41": "A", "42": "C", "43": "A", "44": "C", "45": "C", "46": "C", "47": "D", "48": "B", "49": "A", "50": "A"
+            },
+            exam4: {
+                "1": "A", "2": "C", "3": "A", "4": "B", "5": "D", "6": "A", "7": "B", "8": "D", "9": "B", "10": "A",
+                "11": "B", "12": "C", "13": "A", "14": "C", "15": "B", "16": "B", "17": "B", "18": "B", "19": "B", "20": "C",
+                "21": "B", "22": "B", "23": "B", "24": "A", "25": "D", "26": "D", "27": "B", "28": "B", "29": "C", "30": "B",
+                "31": "B", "32": "B", "33": "D", "34": "B", "35": "B", "36": "A", "37": "C", "38": "C", "39": "D", "40": "B",
+                "41": "B", "42": "A", "43": "D", "44": "D", "45": "A", "46": "C", "47": "A", "48": "A", "49": "A", "50": "C"
+            }
+        };
+
+        let currentQuizData = [];
+        let userAnswers = {};
+        let currentQuizTitle = "";
+        let currentExamKey = ""; // Store the key of the current exam
+
+        // Function to display custom modal messages
+        function showModal(message, customButtonText = null, customButtonCallback = null, showCancelButton = false) {
+            document.getElementById('modalMessage').innerText = message;
+            const modalConfirmButton = document.getElementById('modalConfirmButton');
+            const modalCustomButton = document.getElementById('modalCustomButton');
+
+            // Reset buttons visibility and event listeners
+            modalConfirmButton.style.display = 'block';
+            modalConfirmButton.onclick = closeModal; // Default close action
+            modalConfirmButton.innerText = '确定'; // Reset text to default
+
+            modalCustomButton.style.display = 'none';
+            modalCustomButton.onclick = null; // Clear previous callback
+
+            if (customButtonText && customButtonCallback) {
+                modalCustomButton.innerText = customButtonText;
+                modalCustomButton.style.display = 'block';
+                modalCustomButton.onclick = () => {
+                    closeModal(); // Close modal first
+                    customButtonCallback(); // Then execute custom action
+                };
+                modalConfirmButton.style.display = 'none'; // Hide default '确定' button if custom button exists
+            }
+
+            if (showCancelButton) { // For confirmation dialogs (e.g., "返回试卷选择")
+                modalConfirmButton.innerText = '确认离开';
+                modalConfirmButton.style.display = 'block';
+                modalConfirmButton.onclick = () => {
+                    closeModal(); // Close modal
+                    if (customButtonCallback) customButtonCallback(); // Execute the 'confirm' action
+                };
+
+                modalCustomButton.innerText = '继续答题';
+                modalCustomButton.style.display = 'block';
+                modalCustomButton.onclick = closeModal; // '继续答题' just closes the modal
+            }
+
+            document.getElementById('customModal').style.display = 'flex';
+        }
+
+        // Function to close custom modal
+        function closeModal() {
+            document.getElementById('customModal').style.display = 'none';
+        }
+
+        // Function to start the quiz
+        function startQuiz(examKey) {
+            console.log(`startQuiz called for: ${examKey}`); // Debugging line
+            currentExamKey = examKey; // Set the current exam key
+            currentQuizData = quizData[examKey];
+            currentQuizTitle = document.querySelector(`button[onclick="startQuiz('${examKey}')"]`).innerText;
+            document.getElementById('quiz-title').innerText = currentQuizTitle;
+            userAnswers = {}; // Reset answers for new quiz
+
+            const quizForm = document.getElementById('quiz-form');
+            quizForm.innerHTML = ''; // Clear previous questions
+
+            // Attempt to load saved answers for this exam
+            const savedAnswers = localStorage.getItem(`wset_quiz_answers_${currentExamKey}`);
+            if (savedAnswers) {
+                userAnswers = JSON.parse(savedAnswers);
+            }
+
+            currentQuizData.forEach((q, qIndex) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.id = `question-card-${q.questionNumber}`;
+                questionDiv.className = 'question-card';
+                let optionsHtml = '';
+                q.options.forEach((option, index) => {
+                    // Ensure the value stored is uppercase
+                    const optionValue = option.split(' ')[0].toUpperCase();
+                    const isChecked = userAnswers[q.questionNumber] === optionValue ? 'checked' : '';
+                    optionsHtml += `
+                        <div class="option-container">
+                            <input type="radio" id="${`q${q.questionNumber}-option${index}`}" name="question-${q.questionNumber}" value="${optionValue}" data-question-number="${q.questionNumber}" ${isChecked}>
+                            <label for="${`q${q.questionNumber}-option${index}`}" class="option-label">
+                                ${option}
+                            </label>
+                        </div>
+                    `;
+                });
+
+                questionDiv.innerHTML = `
+                    <p class="text-lg font-medium mb-4"><strong>${q.questionNumber}.</strong> ${q.questionText}</p>
+                    <div class="options">
+                        ${optionsHtml}
+                    </div>
+                `;
+                quizForm.appendChild(questionDiv);
+            });
+
+            // Show quiz section, hide selection and results
+            document.getElementById('test-selection-section').style.display = 'none';
+            document.getElementById('quiz-section').classList.add('active');
+            document.getElementById('results-section').classList.remove('active');
+            document.getElementById('quiz-score').innerText = ''; // Clear previous score
+
+            console.log('Display sections updated.'); // Debugging line
+
+            // Add event listeners for radio button changes to store answers
+            quizForm.querySelectorAll('input[type="radio"]').forEach(radio => {
+                radio.addEventListener('change', (event) => {
+                    const qNum = event.target.dataset.questionNumber;
+                    userAnswers[qNum] = event.target.value; // Value is already uppercase from startQuiz
+                    const questionCard = document.getElementById(`question-card-${qNum}`);
+                    if (questionCard) {
+                        questionCard.classList.remove('highlight-question');
+                    }
+                });
+            });
+        }
+
+        // Helper function to check if all questions are answered
+        function areAllQuestionsAnswered() {
+            let firstUnansweredQuestionNumber = null;
+            for (let i = 0; i < currentQuizData.length; i++) {
+                const qNum = currentQuizData[i].questionNumber;
+                if (!userAnswers[qNum]) {
+                    firstUnansweredQuestionNumber = qNum;
+                    break;
+                }
+            }
+            return firstUnansweredQuestionNumber;
+        }
+
+        // Function to scroll to and highlight a specific question
+        function goToQuestion(questionNumber) {
+            const questionCard = document.getElementById(`question-card-${questionNumber}`);
+            if (questionCard) {
+                questionCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                questionCard.classList.add('highlight-question');
+                setTimeout(() => {
+                    questionCard.classList.remove('highlight-question');
+                }, 3000); // Highlight for 3 seconds
+            }
+        }
+
+        // Function to save user answers
+        function saveUserAnswers() {
+            const firstUnanswered = areAllQuestionsAnswered();
+            if (firstUnanswered) {
+                showModal(
+                    '您有题目未完成，请点击“去答题”完成作答，才能保存。',
+                    '去答题',
+                    () => goToQuestion(firstUnanswered)
+                );
+                return;
+            }
+
+            try {
+                localStorage.setItem(`wset_quiz_answers_${currentExamKey}`, JSON.stringify(userAnswers));
+                showModal('答案已成功保存！');
+            } catch (e) {
+                showModal('保存答案失败，请检查浏览器存储空间或设置。');
+                console.error("Error saving to localStorage:", e);
+            }
+        }
+
+        // Function to handle quiz submission (grading or no answers)
+        function handleQuizSubmission() {
+            const firstUnanswered = areAllQuestionsAnswered();
+            if (firstUnanswered) {
+                showModal(
+                    '您有题目未完成，请点击“去答题”完成作答。',
+                    '去答题',
+                    () => goToQuestion(firstUnanswered)
+                );
+                return;
+            }
+
+            const answersKey = correctAnswers[currentExamKey];
+
+            if (answersKey) {
+                // Quiz has answers, proceed with grading
+                let score = 0;
+                const wrongAnswers = [];
+
+                currentQuizData.forEach(q => {
+                    const qNum = q.questionNumber;
+                    const userAnswer = userAnswers[qNum];
+                    const correctAnswer = answersKey[qNum];
+
+                    // Case-insensitive comparison
+                    if (userAnswer.toUpperCase() === correctAnswer.toUpperCase()) {
+                        score++;
+                    } else {
+                        // Find the full option text for user's answer and correct answer
+                        const userOptionText = q.options.find(opt => opt.startsWith(userAnswer + ' ')) || userAnswer;
+                        const correctOptionText = q.options.find(opt => opt.startsWith(correctAnswer + ' ')) || correctAnswer;
+
+                        wrongAnswers.push({
+                            questionNumber: qNum,
+                            questionText: q.questionText,
+                            userAnswer: userOptionText,
+                            correctAnswer: correctOptionText
+                        });
+                    }
+                });
+
+                const totalQuestions = currentQuizData.length;
+                const scorePercentage = (score / totalQuestions * 100).toFixed(2);
+
+                const answerSheetDiv = document.getElementById('answer-sheet');
+                answerSheetDiv.innerHTML = ''; // Clear previous results
+
+                document.getElementById('quiz-score').innerText = `您的得分: ${score} / ${totalQuestions} (${scorePercentage}%)`;
+
+                if (wrongAnswers.length > 0) {
+                    const wrongAnswersTitle = document.createElement('h3');
+                    wrongAnswersTitle.className = 'text-xl font-semibold text-gray-700 mt-6 mb-4';
+                    wrongAnswersTitle.innerText = '错题详情：';
+                    answerSheetDiv.appendChild(wrongAnswersTitle);
+
+                    wrongAnswers.forEach(item => {
+                        const wrongItemDiv = document.createElement('div');
+                        wrongItemDiv.className = 'answer-item mb-4 p-3 border border-red-200 rounded-md bg-red-50';
+                        wrongItemDiv.innerHTML = `
+                            <p class="text-gray-800"><strong>题号 ${item.questionNumber}.</strong> ${item.questionText}</p>
+                            <p class="text-red-600 mt-2">您的答案: <span class="wrong-answer">${item.userAnswer}</span></p>
+                            <p class="text-green-600">正确答案: <span class="correct-answer">${item.correctAnswer}</span></p>
+                        `;
+                        answerSheetDiv.appendChild(wrongItemDiv);
+                    });
+                } else {
+                    const allCorrectMessage = document.createElement('p');
+                    allCorrectMessage.className = 'text-center text-green-600 text-lg font-medium mt-6';
+                    allCorrectMessage.innerText = '恭喜您，所有题目都回答正确！';
+                    answerSheetDiv.appendChild(allCorrectMessage);
+                }
+
+                // Store results text for download
+                window.quizResultsText = `
+${currentQuizTitle} - 答题结果
+得分: ${score} / ${totalQuestions} (${scorePercentage}%)
+
+${wrongAnswers.length > 0 ? '错题详情：\n' : '恭喜您，所有题目都回答正确！\n'}
+${wrongAnswers.map(item => `
+题号 ${item.questionNumber}. ${item.questionText}
+您的答案: ${item.userAnswer}
+正确答案: ${item.correctAnswer}
+`).join('\n')}
+                `.trim();
+
+                // Show results section
+                document.getElementById('quiz-section').classList.remove('active');
+                document.getElementById('results-section').classList.add('active');
+
+            } else {
+                // Quiz has no answers
+                showModal('暂无答案，请先“保存答案”或等待答案更新。');
+            }
+        }
+
+        // Function to download the results
+        function downloadResults() {
+            if (!window.quizResultsText) {
+                showModal('没有答题结果可以下载。请先完成并提交试卷。');
+                return;
+            }
+
+            const blob = new Blob([window.quizResultsText], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${currentQuizTitle}_答题结果.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showModal('答题结果已下载！');
+        }
+
+        // Function to confirm before resetting the quiz (going back to selection)
+        function confirmResetQuiz() {
+            showModal(
+                '您确定要离开答题界面吗？当前答题结果将不会被保存。',
+                null, // No custom button text for the "go to question" type
+                () => resetQuiz(), // Callback if user confirms
+                true // Show cancel button (which is the default custom button now)
+            );
+        }
+
+        // Function to reset the quiz and go back to selection
+        function resetQuiz() {
+            // Clear saved answers for the current exam from localStorage
+            if (currentExamKey) {
+                localStorage.removeItem(`wset_quiz_answers_${currentExamKey}`);
+            }
+
+            document.getElementById('test-selection-section').style.display = 'block';
+            document.getElementById('quiz-section').classList.remove('active');
+            document.getElementById('results-section').classList.remove('active');
+            document.getElementById('quiz-form').innerHTML = ''; // Clear questions
+            document.getElementById('answer-sheet').innerHTML = ''; // Clear results
+            document.getElementById('quiz-score').innerText = ''; // Clear score
+            userAnswers = {}; // Reset user answers
+            currentQuizData = []; // Clear current quiz data
+            currentQuizTitle = ""; // Clear title
+            currentExamKey = ""; // Clear current exam key
+            window.quizResultsText = ""; // Clear downloadable text
+        }
+    </script>
+</body>
+</html>
